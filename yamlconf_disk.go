@@ -45,6 +45,8 @@ func (m *Manager) reloadFromDisk() (bool, error) {
 		return false, nil
 	}
 
+	log.Debugf("Configuration changed on disk, applying")
+
 	m.setCfg(cfg)
 	m.fileInfo = fileInfo
 
@@ -71,6 +73,7 @@ func (m *Manager) saveToDiskAndUpdate(updated Config) (bool, error) {
 		return false, nil
 	}
 
+	log.Debug("Configuration changed programmatically, saving")
 	log.Trace("Increment version")
 	updated.SetVersion(currentVersion + 1)
 

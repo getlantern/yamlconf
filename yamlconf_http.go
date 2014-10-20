@@ -20,6 +20,8 @@ const (
 )
 
 func (m *Manager) startConfigServer() error {
+	log.Debugf("Starting config server at: %s", m.ConfigServerAddr)
+
 	s := &http.Server{
 		Addr:    m.ConfigServerAddr,
 		Handler: m,
@@ -50,6 +52,12 @@ func (m *Manager) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		}
 
 		err = m.Update(func(orig Config) error {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Errorf("Panic on updating %s: %s", path, r)
+				}
+			}()
+
 			fragment, err := path.ZeroValue(orig)
 			if err != nil {
 				return fmt.Errorf("Unable to get zero value for path %s: %s", path, err)
@@ -70,6 +78,12 @@ func (m *Manager) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		}
 	case DELETE:
 		err := m.Update(func(orig Config) error {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Errorf("Panic on clearing %s: %s", path, r)
+				}
+			}()
+
 			return path.Clear(orig)
 		})
 
