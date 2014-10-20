@@ -163,7 +163,7 @@ func TestCustomPoll(t *testing.T) {
 		},
 		FilePath:         file.Name(),
 		FilePollInterval: pollInterval,
-		CustomPoll: func() (mutator, time.Duration, error) {
+		CustomPoll: func(currentCfg Config) (mutator, time.Duration, error) {
 			defer func() {
 				poll = poll + 1
 			}()

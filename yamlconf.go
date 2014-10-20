@@ -3,6 +3,7 @@ package yamlconf
 import (
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/getlantern/golog"
@@ -13,6 +14,8 @@ var (
 	log = golog.LoggerFor("yamlconf")
 )
 
+// Config is the interface for configuration objects that provide the in-memory
+// representation of yaml configuration managed by yamlconf.
 type Config interface {
 	GetVersion() int
 
@@ -83,9 +86,6 @@ type Config interface {
 //
 //
 type Manager struct {
-	// EmptyConfig: required, factor for new empty Configs
-	EmptyConfig func() Config
-
 	// FilePath: required, path to the config file on disk
 	FilePath string
 
@@ -93,17 +93,21 @@ type Manager struct {
 	// to 1 second
 	FilePollInterval time.Duration
 
-	// CustomPoll: optionally, specify a custom polling function that returns
-	// a mutator for applying the result of polling, the time to wait till the
-	// next poll, and an error (if polling itself failed). This is useful for
-	// example for fetching config updates from a remote server.
-	CustomPoll func() (mutate mutator, waitTime time.Duration, err error)
-
 	// ConfigServerAddr: optionally, specify an address at which to provide a
 	// RESTFUL HTTP server for making config updates.
 	ConfigServerAddr string
 
+	// EmptyConfig: required, factor for new empty Configs
+	EmptyConfig func() Config
+
+	// CustomPoll: optionally, specify a custom polling function that returns
+	// a mutator for applying the result of polling, the time to wait till the
+	// next poll, and an error (if polling itself failed). This is useful for
+	// example for fetching config updates from a remote server.
+	CustomPoll func(currentCfg Config) (mutate mutator, waitTime time.Duration, err error)
+
 	cfg       Config
+	cfgMutex  sync.RWMutex
 	fileInfo  os.FileInfo
 	deltasCh  chan *delta
 	nextCfgCh chan Config
@@ -220,7 +224,7 @@ func (m *Manager) processUpdates() {
 
 func (m *Manager) processCustomPolling() {
 	for {
-		mutate, waitTime, err := m.CustomPoll()
+		mutate, waitTime, err := m.CustomPoll(m.getCfg())
 		if err != nil {
 			log.Errorf("Custom polling failed: %s", err)
 		} else {
@@ -231,6 +235,18 @@ func (m *Manager) processCustomPolling() {
 		}
 		time.Sleep(waitTime)
 	}
+}
+
+func (m *Manager) setCfg(cfg Config) {
+	m.cfgMutex.Lock()
+	defer m.cfgMutex.Unlock()
+	m.cfg = cfg
+}
+
+func (m *Manager) getCfg() Config {
+	m.cfgMutex.RLock()
+	defer m.cfgMutex.RUnlock()
+	return m.cfg
 }
 
 func (m *Manager) copy(orig Config) (copied Config, err error) {

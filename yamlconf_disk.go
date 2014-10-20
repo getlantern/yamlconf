@@ -45,7 +45,7 @@ func (m *Manager) reloadFromDisk() (bool, error) {
 		return false, nil
 	}
 
-	m.cfg = cfg
+	m.setCfg(cfg)
 	m.fileInfo = fileInfo
 
 	return true, nil
@@ -81,7 +81,7 @@ func (m *Manager) saveToDiskAndUpdate(updated Config) (bool, error) {
 	}
 
 	log.Trace("Point to updated")
-	m.cfg = updated
+	m.setCfg(updated)
 	return true, nil
 }
 
