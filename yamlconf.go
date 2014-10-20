@@ -104,7 +104,7 @@ type Manager struct {
 	// a mutator for applying the result of polling, the time to wait till the
 	// next poll, and an error (if polling itself failed). This is useful for
 	// example for fetching config updates from a remote server.
-	CustomPoll func(currentCfg Config) (mutate mutator, waitTime time.Duration, err error)
+	CustomPoll func(currentCfg Config) (mutate func(cfg Config) error, waitTime time.Duration, err error)
 
 	cfg       Config
 	cfgMutex  sync.RWMutex
@@ -128,9 +128,9 @@ func (m *Manager) Next() Config {
 }
 
 // Update updates the config by using the given mutator function.
-func (m *Manager) Update(mutate mutator) error {
+func (m *Manager) Update(mutate func(cfg Config) error) error {
 	errCh := make(chan error)
-	m.deltasCh <- &delta{mutate, errCh}
+	m.deltasCh <- &delta{mutator(mutate), errCh}
 	return <-errCh
 }
 
