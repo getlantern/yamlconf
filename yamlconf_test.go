@@ -2,6 +2,7 @@ package yamlconf
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"sync"
@@ -47,7 +48,7 @@ func (c *TestCfg) ApplyDefaults() {
 	}
 }
 
-func TestNormal(t *testing.T) {
+func TestFileAndUpdate(t *testing.T) {
 	file, err := ioutil.TempFile("", "yamlconf_test_")
 	if err != nil {
 		t.Fatalf("Unable to create temp file: %s", err)
@@ -62,7 +63,7 @@ func TestNormal(t *testing.T) {
 		FilePollInterval: pollInterval,
 	}
 
-	err = m.Start()
+	first, err := m.Start()
 	if err != nil {
 		t.Fatalf("Unable to start manager: %s", err)
 	}
@@ -74,10 +75,30 @@ func TestNormal(t *testing.T) {
 		},
 	})
 
+	assert.Equal(t, &TestCfg{
+		Version: 1,
+		N: &Nested{
+			I: FIXED_I,
+		},
+	}, first, "First config should contain correct data")
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		// Push updates
+
+		// Push update with bad version file (this should not get emitted as an
+		// updated config)
+		saveConfig(t, file, &TestCfg{
+			Version: 0,
+			N: &Nested{
+				S: "3",
+				I: 3,
+			},
+		})
+
+		// Wait for file update to get picked up
+		time.Sleep(pollInterval * 2)
 
 		// Push update to file
 		saveConfig(t, file, &TestCfg{
@@ -109,14 +130,6 @@ func TestNormal(t *testing.T) {
 	assert.Equal(t, &TestCfg{
 		Version: 1,
 		N: &Nested{
-			I: 55,
-		},
-	}, updated, "Config from initial load should contain correct data, including automatic version and default I")
-
-	updated = m.Next()
-	assert.Equal(t, &TestCfg{
-		Version: 1,
-		N: &Nested{
 			S: "3",
 			I: 3,
 		},
@@ -132,6 +145,60 @@ func TestNormal(t *testing.T) {
 	}, updated, "Config from programmatic update should contain correct data, including updated version")
 
 	wg.Wait()
+}
+
+func TestCustomPoll(t *testing.T) {
+	file, err := ioutil.TempFile("", "yamlconf_test_")
+	if err != nil {
+		t.Fatalf("Unable to create temp file: %s", err)
+	}
+	defer os.Remove(file.Name())
+
+	poll := 0
+	m := &Manager{
+		EmptyConfig: func() Config {
+			return &TestCfg{}
+		},
+		FilePath:         file.Name(),
+		FilePollInterval: pollInterval,
+		CustomPoll: func() (mutator, time.Duration, error) {
+			defer func() {
+				poll = poll + 1
+			}()
+			switch poll {
+			case 0:
+				// Return an error on the poll
+				return nil, 10 * time.Millisecond, fmt.Errorf("I don't wanna poll")
+			case 1:
+				// Return an error in the mutator
+				return func(cfg Config) error {
+					return fmt.Errorf("I don't wannt mutate")
+				}, 10 * time.Millisecond, nil
+			default:
+				// Return a good mutator
+				return func(cfg Config) error {
+					tc := cfg.(*TestCfg)
+					tc.N.S = "Modified"
+					return nil
+				}, 100 * time.Hour, nil
+			}
+		},
+	}
+
+	_, err = m.Start()
+	if err != nil {
+		t.Fatalf("Unable to start manager: %s", err)
+	}
+
+	updated := m.Next()
+
+	assert.Equal(t, &TestCfg{
+		Version: 2,
+		N: &Nested{
+			S: "Modified",
+			I: FIXED_I,
+		},
+	}, updated, "Custom polled config should contain correct data")
 }
 
 func assertSavedConfigEquals(t *testing.T, file *os.File, expected *TestCfg) {

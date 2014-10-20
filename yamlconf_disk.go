@@ -35,6 +35,8 @@ func (m *Manager) reloadFromDisk() (bool, error) {
 	}
 
 	if m.cfg != nil && m.cfg.GetVersion() != cfg.GetVersion() {
+		log.Trace("Version mismatch on disk, overwriting what's on disk with current version")
+		m.writeToDisk(m.cfg)
 		return false, fmt.Errorf("Version of config on disk did not match expected. Expected %d, found %d", m.cfg.GetVersion(), cfg.GetVersion())
 	}
 
@@ -73,22 +75,30 @@ func (m *Manager) saveToDiskAndUpdate(updated Config) (bool, error) {
 	updated.SetVersion(currentVersion + 1)
 
 	log.Trace("Save updated")
-	bytes, err := yaml.Marshal(updated)
+	err := m.writeToDisk(updated)
 	if err != nil {
-		return false, fmt.Errorf("Unable to marshal config yaml: %s", err)
-	}
-	err = ioutil.WriteFile(m.FilePath, bytes, 0644)
-	if err != nil {
-		return false, fmt.Errorf("Unable to write config yaml to file %s: %s", m.FilePath, err)
-	}
-	m.fileInfo, err = os.Stat(m.FilePath)
-	if err != nil {
-		return false, fmt.Errorf("Unable to stat file %s: %s", m.FilePath, err)
+		return false, err
 	}
 
 	log.Trace("Point to updated")
 	m.cfg = updated
 	return true, nil
+}
+
+func (m *Manager) writeToDisk(cfg Config) error {
+	bytes, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("Unable to marshal config yaml: %s", err)
+	}
+	err = ioutil.WriteFile(m.FilePath, bytes, 0644)
+	if err != nil {
+		return fmt.Errorf("Unable to write config yaml to file %s: %s", m.FilePath, err)
+	}
+	m.fileInfo, err = os.Stat(m.FilePath)
+	if err != nil {
+		return fmt.Errorf("Unable to stat file %s: %s", m.FilePath, err)
+	}
+	return nil
 }
 
 // HasChangedOnDisk checks whether Config has changed on disk
