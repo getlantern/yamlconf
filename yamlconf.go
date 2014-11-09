@@ -201,7 +201,7 @@ func (m *Manager) Start() (Config, error) {
 		}
 	}
 
-	return m.cfg, nil
+	return m.getCfg(), nil
 }
 
 func (m *Manager) processUpdates() {

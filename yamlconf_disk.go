@@ -58,24 +58,28 @@ func (m *Manager) saveToDiskAndUpdate(updated Config) (bool, error) {
 	updated.ApplyDefaults()
 
 	log.Trace("Remembering current version")
-	currentVersion := 0
-	if m.cfg != nil {
-		currentVersion = m.cfg.GetVersion()
-		log.Trace("Temporarily set version to 0 to prepare for comparison")
-		m.cfg.SetVersion(0)
+	original := m.cfg
+	if original != nil {
+		log.Trace("Copying original config in preparation for comparison")
+		var err error
+		original, err = m.copy(m.cfg)
+		if err != nil {
+			return false, fmt.Errorf("Unable to copy original config for comparison")
+		}
+		log.Trace("Set version to 0 prior to comparison")
+		original.SetVersion(0)
 	}
 
 	log.Trace("Compare config without version")
 	updated.SetVersion(0)
-	if reflect.DeepEqual(m.cfg, updated) {
+	if reflect.DeepEqual(original, updated) {
 		log.Trace("Configuration unchanged, do nothing")
-		m.cfg.SetVersion(currentVersion)
 		return false, nil
 	}
 
 	log.Debug("Configuration changed programmatically, saving")
 	log.Trace("Increment version")
-	updated.SetVersion(currentVersion + 1)
+	updated.SetVersion(m.cfg.GetVersion() + 1)
 
 	log.Trace("Save updated")
 	err := m.writeToDisk(updated)
