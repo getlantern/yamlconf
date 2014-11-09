@@ -58,9 +58,9 @@ func (m *Manager) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 				}
 			}()
 
-			fragment, err := path.ZeroValue(orig)
+			fragment, err := path.Get(orig)
 			if err != nil {
-				return fmt.Errorf("Unable to get zero value for path %s: %s", path, err)
+				return fmt.Errorf("Unable to get current value at path %s: %s", path, err)
 			}
 
 			err = yaml.Unmarshal(body, fragment)
