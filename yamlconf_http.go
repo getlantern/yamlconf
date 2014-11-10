@@ -40,6 +40,9 @@ func (m *Manager) startConfigServer() error {
 func (m *Manager) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
+	if len(req.URL.Path) < 2 {
+		fail(resp, "Invalid path")
+	}
 	path := pathreflect.Parse(req.URL.Path[1:])
 
 	switch req.Method {
