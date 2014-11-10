@@ -174,7 +174,7 @@ func TestCustomPoll(t *testing.T) {
 			case 1:
 				// Return an error in the mutator
 				return func(cfg Config) error {
-					return fmt.Errorf("I don't wannt mutate")
+					return fmt.Errorf("I don't wanna mutate")
 				}, 10 * time.Millisecond, nil
 			default:
 				// Return a good mutator

@@ -59,6 +59,7 @@ func (m *Manager) saveToDiskAndUpdate(updated Config) (bool, error) {
 
 	log.Trace("Remembering current version")
 	original := m.cfg
+	nextVersion := 0
 	if original != nil {
 		log.Trace("Copying original config in preparation for comparison")
 		var err error
@@ -68,6 +69,8 @@ func (m *Manager) saveToDiskAndUpdate(updated Config) (bool, error) {
 		}
 		log.Trace("Set version to 0 prior to comparison")
 		original.SetVersion(0)
+		log.Trace("Incrementing version")
+		nextVersion = m.cfg.GetVersion() + 1
 	}
 
 	log.Trace("Compare config without version")
@@ -79,7 +82,7 @@ func (m *Manager) saveToDiskAndUpdate(updated Config) (bool, error) {
 
 	log.Debug("Configuration changed programmatically, saving")
 	log.Trace("Increment version")
-	updated.SetVersion(m.cfg.GetVersion() + 1)
+	updated.SetVersion(nextVersion)
 
 	log.Trace("Save updated")
 	err := m.writeToDisk(updated)
